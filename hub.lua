@@ -1,8 +1,8 @@
--- KIRA AniPixels Hub v28.0 | Auto Farm Minions corrigido (TP único + parado)
+-- TheusReal AniPixels Hub v28.0 | Auto Farm Minions corrigido (TP único + parado)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "TheusReal Hub v28.0 - Extras corrigidos",
+    Name = "TheusReal Hub v2.0 - Extras corrigidos",
     LoadingTitle = "Carregando...",
     LoadingSubtitle = "por TheusReal • Aracaju-SE",
     ConfigurationSaving = { Enabled = false }
