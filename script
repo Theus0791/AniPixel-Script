@@ -1,0 +1,391 @@
+-- KIRA AniPixels Hub v28.0 | Auto Farm Minions corrigido (TP único + parado)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "TheusReal Hub v28.0 - Extras corrigidos",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "por TheusReal • Aracaju-SE",
+    ConfigurationSaving = { Enabled = false }
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+
+local AFK_POS = Vector3.new(-251, -2, -901)
+local RETURN_POS = Vector3.new(-45, 13, -29)
+
+local BOSS_NAMES = {"Boros", "All For One", "Madara Ten Tails", "Fusion Zamasu (Corrupted)", "Heian Era Sukuna"}
+
+local MinionPositions = {
+    ["Griff"] = Vector3.new(1738, -288, -207),
+    ["Goots"] = Vector3.new(1690, -288, -264),
+    ["MagicalTrio"] = Vector3.new(1843, -288, -417),
+    ["Zoono"] = Vector3.new(1766, -285, -424),
+    ["Astto"] = Vector3.new(1721, -283, -540),
+    ["Yoono"] = Vector3.new(1856, -273, -495),
+}
+
+-- Coordenadas do botão de ataque (atualizadas!)
+local ATTACK_BUTTON_POS = Vector2.new(1231, 883)
+
+_G.FarmBoss = false
+_G.UseScriptAttack = false
+_G.FarmMinions = false
+_G.Noclip = false
+_G.AutoBalls = false
+_G.EspEnabled = false
+_G.SelectedEntity = "Todos"
+_G.SelectedMinion = "Griff"
+_G.WalkSpeed = 16
+
+-- TP Suave
+local function tpTo(pos)
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+    local tween = TweenService:Create(root, TweenInfo.new(1.2, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos + Vector3.new(0, 8, 0))})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- ================== AUTO FARM MINIONS (CORRIGIDO - TP ÚNICO + FICA PARADO) ==================
+local TabMinions = Window:CreateTab("🐾 Auto Farm Minions", 4483362458)
+
+TabMinions:CreateDropdown({
+    Name = "Escolha o Minion",
+    Options = {"Griff", "Goots", "MagicalTrio", "Zoono", "Astto", "Yoono"},
+    CurrentOption = {"Griff"},
+    Callback = function(CurrentOption)
+        _G.SelectedMinion = CurrentOption[1]
+        Rayfield:Notify({Title = "Minion Selecionado", Content = _G.SelectedMinion, Duration = 3})
+    end,
+})
+
+TabMinions:CreateToggle({
+    Name = "Iniciar Auto Farm Minions (TP uma vez + fica parado)",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.FarmMinions = Value
+        if Value then
+            local pos = MinionPositions[_G.SelectedMinion]
+            if pos then
+                tpTo(pos)
+                Rayfield:Notify({
+                    Title = "Farm Minions Iniciado",
+                    Content = "Você está parado na posição de " .. _G.SelectedMinion .. "\nDeixe o auto-ataque do jogo trabalhar.",
+                    Duration = 6
+                })
+            else
+                Rayfield:Notify({Title = "Erro", Content = "Posição não encontrada.", Duration = 5})
+                _G.FarmMinions = false
+            end
+        end
+    end,
+})
+
+TabMinions:CreateButton({
+    Name = "Atualizar TP para Minion Selecionado",
+    Callback = function()
+        local pos = MinionPositions[_G.SelectedMinion]
+        if pos then
+            tpTo(pos)
+            Rayfield:Notify({Title = "TP Feito", Content = "Parado em " .. _G.SelectedMinion, Duration = 4})
+        else
+            Rayfield:Notify({Title = "Erro", Content = "Posição não encontrada.", Duration = 5})
+        end
+    end,
+})
+
+-- TP Suave (por cima da porta + descida)
+local function tpToBoss(boss)
+    if not boss or not boss:FindFirstChild("HumanoidRootPart") then return end
+
+    -- 1. Sobe alto pra passar portal/porta
+    local highPos = boss.HumanoidRootPart.Position + Vector3.new(0, 55, 0)
+    local char = player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local root = char.HumanoidRootPart
+        local tweenHigh = TweenService:Create(root, TweenInfo.new(1.5), {CFrame = CFrame.new(highPos)})
+        tweenHigh:Play()
+        tweenHigh.Completed:Wait()
+    end
+    wait(0.3)
+
+    -- 2. Desce perto do boss
+    local safePos = boss.HumanoidRootPart.Position + Vector3.new(0, 8, 0)
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local root = char.HumanoidRootPart
+        local tweenDown = TweenService:Create(root, TweenInfo.new(0.9), {CFrame = CFrame.new(safePos)})
+        tweenDown:Play()
+        tweenDown.Completed:Wait()
+    end
+end
+
+-- Encontrar boss mais próximo
+local function findNearestBoss()
+    local nearest = nil
+    local minDist = math.huge
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and obj.Humanoid.Health > 0 then
+            local name = obj.Name
+            local dist = (obj.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            if (table.find(BOSS_NAMES, name) or obj.Humanoid.MaxHealth > 5000) and dist < minDist then
+                nearest = obj
+                minDist = dist
+            end
+        end
+    end
+    return nearest
+end
+
+-- ================== FARM BOSS AFK - LOOP INFINITO SEM RETORNO AO SPAWN ==================
+local TabFarm = Window:CreateTab("👹 Farm Boss AFK", 4483362458)
+
+TabFarm:CreateToggle({
+    Name = "Farm Boss AFK (Loop infinito - sem voltar ao spawn)",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.FarmBoss = Value
+        if Value then
+            spawn(function()
+                while _G.FarmBoss do
+                    local boss = findNearestBoss()
+                    if boss then
+                        tpToBoss(boss)
+                        Rayfield:Notify({
+                            Title = "Boss Selecionado",
+                            Content = "Farming: " .. boss.Name .. "\nAguardando derrota...",
+                            Duration = 5
+                        })
+
+                        -- Espera o boss morrer (verifica HP ou existência)
+                        while boss.Parent and boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 do
+                            wait(1)
+                        end
+
+                        Rayfield:Notify({Title = "Boss Derrotado", Content = "Esperando 5s para novo boss...", Duration = 4})
+                        wait(5)  -- Espera 5 segundos antes de procurar novo boss
+                    else
+                        Rayfield:Notify({Title = "Aviso", Content = "Nenhum boss encontrado. Esperando...", Duration = 5})
+                        wait(5)
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+-- ================== TELEPORTE PRESO ==================
+local TabPreso = Window:CreateTab("🔒 Teleporte Preso", 4483362458)
+
+TabPreso:CreateButton({
+    Name = "Teleportar Preso (-251, -2, -901)",
+    Callback = function() tpTo(AFK_POS) end,
+})
+
+TabPreso:CreateButton({
+    Name = "Voltar para Spawn (-45, 13, -29)",
+    Callback = function() tpTo(RETURN_POS) end,
+})
+
+-- ================== DRAGON BALLS ==================
+local TabBalls = Window:CreateTab("⭐ Dragon Balls", 4483362458)
+TabBalls:CreateToggle({
+    Name = "Auto Collect Dragon Balls",
+    CurrentValue = false,
+    Callback = function(Value) _G.AutoBalls = Value end,
+})
+
+-- ================== EXTRAS ==================
+local TabExtra = Window:CreateTab("⚙️ Extras", 4483362458)
+
+TabExtra:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.Noclip = Value
+        Rayfield:Notify({Title = "Noclip", Content = Value and "ATIVADO" or "DESATIVADO", Duration = 3})
+    end,
+})
+
+-- Noclip forçado constante
+RunService.Stepped:Connect(function()
+    if _G.Noclip and player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+TabExtra:CreateToggle({
+    Name = "Godmode (HP Infinito)",
+    CurrentValue = false,
+    Callback = function(Value)
+        local hum = player.Character and player.Character:FindFirstChild("Humanoid")
+        if hum then
+            hum.MaxHealth = Value and math.huge or 100
+            hum.Health = Value and math.huge or hum.Health
+        end
+        Rayfield:Notify({Title = "Godmode", Content = Value and "ATIVADO" or "DESATIVADO", Duration = 3})
+    end,
+})
+
+TabExtra:CreateSlider({
+    Name = "Walk Speed",
+    Range = {16, 200},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(Value)
+        _G.WalkSpeed = Value
+        local hum = player.Character and player.Character:FindFirstChild("Humanoid")
+        if hum then hum.WalkSpeed = Value end
+    end,
+})
+
+TabExtra:CreateButton({
+    Name = "🛑 SELF DESTRUCT (Parar tudo)",
+    Callback = function()
+        _G.FarmBoss = false
+        _G.FarmMinions = false
+        _G.EspEnabled = false
+        _G.AutoBalls = false
+        _G.Noclip = false
+        _G.UseScriptAttack = false
+        
+        -- Limpa ESP
+        clearESP()
+        
+        -- Notifica e destrói GUI
+        Rayfield:Notify({Title = "SELF DESTRUCT", Content = "Script parado e destruído!", Duration = 5})
+        pcall(function() Window:Destroy() end)
+        
+        print("🛑 SELF DESTRUCT EXECUTADO - Tudo parado!")
+    end,
+})
+
+-- ================== ABA ESP DINÂMICO ==================
+local TabESP = Window:CreateTab("👁️ ESP Dinâmico", 4483362458)
+
+local espDropdown = TabESP:CreateDropdown({
+    Name = "Escolha o Bixo",
+    Options = {"Todos"},
+    CurrentOption = {"Todos"},
+    Callback = function(CurrentOption)
+        _G.SelectedEntity = CurrentOption[1]
+        Rayfield:Notify({Title = "ESP", Content = "Selecionado: " .. _G.SelectedEntity, Duration = 3})
+    end,
+})
+
+TabESP:CreateButton({
+    Name = "Atualizar Entidades do Mapa",
+    Callback = function()
+        local entities = {"Todos"}
+        local seen = {}
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and not seen[obj.Name] then
+                seen[obj.Name] = true
+                table.insert(entities, obj.Name)
+            end
+        end
+        espDropdown:Refresh(entities, true)  -- true = atualiza visualmente
+        Rayfield:Notify({Title = "✅ Scan Concluído", Content = #entities-1 .. " entidades encontradas!", Duration = 5})
+    end,
+})
+
+local espConnections = {}
+
+local function createESP(target)
+    if espConnections[target] then return end
+    if not target:FindFirstChild("Head") then return end
+
+    local bb = Instance.new("BillboardGui", target.Head)
+    bb.Name = "KIRA_ESP"
+    bb.Size = UDim2.new(0, 240, 0, 70)
+    bb.StudsOffset = Vector3.new(0, 4, 0)
+    bb.AlwaysOnTop = true
+
+    local nameLabel = Instance.new("TextLabel", bb)
+    nameLabel.Size = UDim2.new(1,0,0.5,0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.new(1, 0.4, 1)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.Code
+
+    local hpLabel = Instance.new("TextLabel", bb)
+    hpLabel.Size = UDim2.new(1,0,0.5,0)
+    hpLabel.Position = UDim2.new(0,0,0.5,0)
+    hpLabel.BackgroundTransparency = 1
+    hpLabel.TextColor3 = Color3.new(0,1,0)
+    hpLabel.TextStrokeTransparency = 0
+    hpLabel.TextScaled = true
+    hpLabel.Font = Enum.Font.Code
+
+    espConnections[target] = RunService.Heartbeat:Connect(function()
+        if target.Parent and target:FindFirstChild("Humanoid") and target:FindFirstChild("HumanoidRootPart") then
+            local dist = (target.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            nameLabel.Text = target.Name .. " [" .. math.floor(dist) .. "m]"
+            hpLabel.Text = "HP: " .. math.floor(target.Humanoid.Health) .. "/" .. math.floor(target.Humanoid.MaxHealth)
+        else
+            bb:Destroy()
+            espConnections[target]:Disconnect()
+            espConnections[target] = nil
+        end
+    end)
+end
+
+local function clearESP()
+    for target, conn in pairs(espConnections) do
+        if conn then conn:Disconnect() end
+        espConnections[target] = nil
+    end
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:FindFirstChild("KI'RA_ESP") then obj.KIRA_ESP:Destroy() end
+    end
+end
+
+TabESP:CreateToggle({
+    Name = "Ativar ESP para o Bixo Selecionado",
+    CurrentValue = false,
+    Callback = function(Value)
+        _G.EspEnabled = Value
+        if Value then
+            spawn(function()
+                while _G.EspEnabled do
+                    for _, obj in pairs(workspace:GetDescendants()) do
+                        if obj:FindFirstChild("Humanoid") and obj:FindFirstChild("HumanoidRootPart") then
+                            if _G.SelectedEntity == "Todos" or obj.Name == _G.SelectedEntity then
+                                createESP(obj)
+                            end
+                        end
+                    end
+                    wait(2)
+                end
+            end)
+        else
+            clearESP()
+        end
+    end,
+})
+
+TabESP:CreateButton({
+    Name = "Limpar ESP",
+    Callback = function()
+        clearESP()
+        Rayfield:Notify({Title = "ESP", Content = "ESP limpo!", Duration = 3})
+    end,
+})
+
+Rayfield:Notify({
+    Title = "TheusReal Hub v27.0 FINAL",
+    Content = "Farm Minions corrigido!\nTP uma vez → fica parado na posição.\nAgradeço ao apoio.",
+    Duration = 10
+})
+
+print("✅ v2.0 FINAL CARREGADO!")
